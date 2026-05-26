@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: precious-metals
+    runtime: python
+    buildCommand: ""
+    startCommand: python3 server.py
+    plan: free
