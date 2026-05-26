@@ -184,40 +184,9 @@
           <i class="fas fa-sync-alt text-xs"></i>
           <span>刷新</span>
         </button>
-        <!-- Settings button -->
-        <button onclick="toggleApiSettings()"
-          class="w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300"
-          style="background: rgba(255,255,255,0.04); color: var(--text-secondary); border: 1px solid var(--border);">
-          <i class="fas fa-cog text-sm"></i>
-        </button>
       </div>
     </div>
 
-    <!-- API Settings Panel -->
-    <div id="apiSettings" class="mt-4 p-4 rounded-xl hidden fade-in-up"
-         style="background: var(--bg-card); border: 1px solid var(--border);">
-      <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-end">
-        <div class="flex-1 w-full">
-          <label class="text-xs text-gray-400 mb-1.5 block">
-            <i class="fas fa-key mr-1" style="color: var(--gold);"></i>GoldAPI.io Key
-            <a href="https://www.goldapi.io" target="_blank" class="text-blue-400 hover:underline ml-1">免费注册 →</a>
-          </label>
-          <input type="password" id="apiKeyInput"
-            class="w-full px-3 py-2 rounded-lg text-sm transition-all duration-200"
-            style="background: var(--bg-primary); border: 1px solid var(--border); color: var(--text-primary); outline: none;"
-            placeholder="输入你的 GoldAPI Key（可选，留空使用免费数据源）">
-        </div>
-        <button onclick="saveApiKey()"
-          class="px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 whitespace-nowrap"
-          style="background: var(--gold); color: #000;">
-          <i class="fas fa-check mr-1"></i>保存
-        </button>
-      </div>
-      <p class="text-xs text-gray-500 mt-3">
-        <i class="fas fa-info-circle mr-1"></i>
-        不填 Key 将使用免费数据源（数据有延迟），注册 GoldAPI 可获得更精准的实时价格（每月免费 500 次请求）。
-      </p>
-    </div>
   </header>
 
   <!-- Main Content -->
@@ -424,7 +393,7 @@
   </main>
 
 <script>
-// ─── State ──────────────────────────────────────────────
+// ─── Store data ─────────────────────────────────────────
 const STORE_PREMIUMS = {
   '周大福': { jewelry: 1.15, bar: 1.05, buyback: 0.97 },
   '老凤祥': { jewelry: 1.14, bar: 1.04, buyback: 0.97 },
@@ -433,326 +402,116 @@ const STORE_PREMIUMS = {
   '中国黄金': { jewelry: 1.10, bar: 1.02, buyback: 0.98 },
 };
 
-let state = {
-  goldApiKey: localStorage.getItem('goldApiKey') || '',
-  autoRefresh: true,
-  refreshTimer: null,
-  countdownTimer: null,
-  countdown: 60,
-  previousPrices: {},
-  exchangeRate: 7.25, // USD/CNY fallback
-  dataSource: 'unknown',
-};
+let autoRefresh = true;
+let refreshTimer = null;
+let countdown = 60;
+let countdownTimer = null;
+let previousPrices = {};
 
 // ─── Init ───────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-  const savedKey = localStorage.getItem('goldApiKey');
-  if (savedKey) {
-    document.getElementById('apiKeyInput').value = savedKey;
-    state.goldApiKey = savedKey;
-  }
-  fetchAllPrices();
+  loadPrices();
   startAutoRefresh();
 });
 
-// ─── API Settings ───────────────────────────────────────
-function toggleApiSettings() {
-  const panel = document.getElementById('apiSettings');
-  panel.classList.toggle('hidden');
-}
-
-function saveApiKey() {
-  const key = document.getElementById('apiKeyInput').value.trim();
-  state.goldApiKey = key;
-  if (key) {
-    localStorage.setItem('goldApiKey', key);
-  } else {
-    localStorage.removeItem('goldApiKey');
+// ─── Load data from JSON ─────────────────────────────────
+async function loadPrices() {
+  try {
+    const resp = await fetch('data.json?_=' + Date.now());
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    updateUI(data);
+    setStatus('ok', '数据正常 · 自动更新');
+  } catch (e) {
+    console.warn('Load failed:', e.message);
+    setStatus('error', '数据加载失败，将自动重试...');
   }
-  document.getElementById('apiSettings').classList.add('hidden');
-  refreshPrices();
 }
 
 // ─── Auto Refresh ───────────────────────────────────────
 function toggleAutoRefresh() {
-  state.autoRefresh = !state.autoRefresh;
+  autoRefresh = !autoRefresh;
   const track = document.getElementById('autoRefreshToggle');
-  if (state.autoRefresh) {
-    track.classList.add('active');
-    startAutoRefresh();
-  } else {
-    track.classList.remove('active');
-    stopAutoRefresh();
-  }
+  if (autoRefresh) { track.classList.add('active'); startAutoRefresh(); }
+  else { track.classList.remove('active'); stopAutoRefresh(); }
 }
 
 function startAutoRefresh() {
   stopAutoRefresh();
-  state.countdown = 60;
-  state.countdownTimer = setInterval(updateCountdown, 1000);
-  state.refreshTimer = setInterval(refreshPrices, 60000);
+  countdown = 60;
+  countdownTimer = setInterval(() => { countdown--; if (countdown <= 0) countdown = 60; updateTimeDisplay(); }, 1000);
+  refreshTimer = setInterval(loadPrices, 60000);
 }
 
 function stopAutoRefresh() {
-  if (state.refreshTimer) { clearInterval(state.refreshTimer); state.refreshTimer = null; }
-  if (state.countdownTimer) { clearInterval(state.countdownTimer); state.countdownTimer = null; }
-  document.getElementById('updateTime').textContent = '自动刷新已停止';
-}
-
-function updateCountdown() {
-  state.countdown--;
-  if (state.countdown <= 0) state.countdown = 60;
+  if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
+  if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
 }
 
 async function refreshPrices() {
   const btn = document.getElementById('refreshBtn');
   const icon = btn.querySelector('i');
   icon.classList.add('fa-spin');
-  state.countdown = 60;
-  await fetchAllPrices();
-  setTimeout(() => icon.classList.remove('fa-spin'), 500);
+  countdown = 60;
+  await loadPrices();
+  setTimeout(() => icon.classList.remove('fa-spin'), 400);
 }
 
-// ─── Core Fetch Logic ───────────────────────────────────
-async function fetchAllPrices() {
-  let goldData = null;
-  let source = 'unknown';
-
-  // Strategy 1: GoldAPI.io (if key provided)
-  if (state.goldApiKey) {
-    try {
-      goldData = await fetchGoldAPI();
-      source = 'GoldAPI.io';
-    } catch (e) {
-      console.warn('GoldAPI failed:', e.message);
-    }
-  }
-
-  // Strategy 2: Stooq (free, no key)
-  if (!goldData) {
-    try {
-      goldData = await fetchStooq();
-      source = 'Stooq (免费)';
-    } catch (e) {
-      console.warn('Stooq failed:', e.message);
-    }
-  }
-
-  if (goldData) {
-    state.dataSource = source;
-    updateUI(goldData);
-  } else {
-    setStatus('error', '无法获取数据，请检查网络连接后重试');
-  }
+// ─── Update time display ─────────────────────────────────
+function updateTimeDisplay() {
+  const el = document.getElementById('updateTime');
+  if (el) el.textContent = `自动刷新中 · 下次更新: ${countdown}s`;
 }
 
-// ─── GoldAPI.io Fetch ────────────────────────────────────
-async function fetchGoldAPI() {
-  const metals = [
-    { sym: 'XAU', curr: 'USD' },
-    { sym: 'XAU', curr: 'CNY' },
-    { sym: 'XAG', curr: 'USD' },
-    { sym: 'XPT', curr: 'USD' },
-    { sym: 'XPD', curr: 'USD' },
-  ];
-
-  const results = {};
-  for (const { sym, curr } of metals) {
-    const resp = await fetch(`https://www.goldapi.io/api/${sym}/${curr}`, {
-      headers: { 'x-access-token': state.goldApiKey, 'Content-Type': 'application/json' }
-    });
-    if (!resp.ok) {
-      if (resp.status === 403) throw new Error('API Key 无效或已过期，请重新申请');
-      throw new Error(`GoldAPI ${sym}/${curr} returned ${resp.status}`);
-    }
-    const data = await resp.json();
-    results[`${sym}_${curr}`] = data;
-  }
-
-  // Also get USDCNY rate from goldapi
-  try {
-    const rateResp = await fetch('https://www.goldapi.io/api/USD/CNY', {
-      headers: { 'x-access-token': state.goldApiKey, 'Content-Type': 'application/json' }
-    });
-    if (rateResp.ok) {
-      const rateData = await rateResp.json();
-      state.exchangeRate = rateData.price || state.exchangeRate;
-    }
-  } catch (e) { /* keep old rate */ }
-
-  return {
-    source: 'goldapi',
-    xauUsd: results['XAU_USD'],
-    xauCny: results['XAU_CNY'],
-    xagUsd: results['XAG_USD'],
-    xptUsd: results['XPT_USD'],
-    xpdUsd: results['XPD_USD'],
-    exchangeRate: state.exchangeRate,
-  };
-}
-
-// ─── Fetch single symbol from Stooq ──────────────────────
-async function fetchOneStooq(symbol) {
-  const urls = [
-    `/api/stooq?symbol=${symbol}`,
-    `https://stooq.com/q/l/?s=${symbol}&f=sd2t2ohlcv&e=json`,
-  ];
-  for (const url of urls) {
-    try {
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 4000);
-      const resp = await fetch(url, { signal: ctrl.signal });
-      clearTimeout(timer);
-      if (!resp.ok) continue;
-      let raw = await resp.text();
-      raw = raw.replace('"volume":}', '"volume":null}');
-      const json = JSON.parse(raw);
-      const item = json.symbols?.[0];
-      if (!item) continue;
-      const close = parseFloat(item.close);
-      const open = parseFloat(item.open);
-      return {
-        price: close,
-        open_price: open,
-        high_price: parseFloat(item.high),
-        low_price: parseFloat(item.low),
-        prev_close_price: open,
-        ch: close - open,
-        chp: open !== 0 ? ((close - open) / open) * 100 : 0,
-      };
-    } catch (e) { continue; }
-  }
-  return null;
-}
-
-// ─── Stooq Fetch (parallel, free fallback) ────────────────
-async function fetchStooq() {
-  const results = { source: 'stooq', exchangeRate: state.exchangeRate };
-
-  // Fire all 5 requests in parallel
-  const [xauUsd, xagUsd, xptUsd, xpdUsd, rateData] = await Promise.all([
-    fetchOneStooq('XAUUSD'),
-    fetchOneStooq('XAGUSD'),
-    fetchOneStooq('XPTUSD'),
-    fetchOneStooq('XPDUSD'),
-    fetchOneStooq('USDCNY'),
-  ]);
-
-  if (xauUsd) results.xauUsd = xauUsd;
-  if (xagUsd) results.xagUsd = xagUsd;
-  if (xptUsd) results.xptUsd = xptUsd;
-  if (xpdUsd) results.xpdUsd = xpdUsd;
-
-  if (rateData) {
-    state.exchangeRate = rateData.price;
-    results.exchangeRate = rateData.price;
-  }
-
-  // Calculate CNY prices from USD
-  if (results.xauUsd && !results.xauCny) {
-    const rate = state.exchangeRate;
-    const usdPerOz = results.xauUsd.price;
-    const cnyPerGram = (usdPerOz * rate) / 31.1035;
-    results.xauCny = {
-      price: cnyPerGram,
-      open_price: (results.xauUsd.open_price * rate) / 31.1035,
-      high_price: (results.xauUsd.high_price * rate) / 31.1035,
-      low_price: (results.xauUsd.low_price * rate) / 31.1035,
-      prev_close_price: (results.xauUsd.prev_close_price * rate) / 31.1035,
-      ch: (usdPerOz - results.xauUsd.prev_close_price) * rate / 31.1035,
-      chp: results.xauUsd.chp,
-    };
-  }
-
-  if (!results.xauUsd && !results.xauCny) {
-    throw new Error('所有数据源均无法获取金价数据');
-  }
-
-  return results;
-}
-
-// ─── Update UI ───────────────────────────────────────────
-function updateUI(data) {
-  const sourceTag = data.source === 'goldapi' ? 'GoldAPI (实时)' : 'Stooq (免费·有延迟)';
-
-  // Time
+// ─── Update UI from data ─────────────────────────────────
+function updateUI(d) {
   const now = new Date();
   const timeStr = now.toLocaleTimeString('zh-CN', { hour12: false });
   document.getElementById('updateTime').textContent =
-    `最后更新: ${timeStr} · 数据源: ${sourceTag} · 下次刷新: ${state.countdown}s`;
+    `数据时间: ${d.updatedAt || '--'} · 刷新: ${countdown}s`;
 
   // Gold USD
-  if (data.xauUsd) {
-    updatePriceDisplay('intlPrice', data.xauUsd.price, '$', 0, 'intlChange', data.xauUsd.ch, data.xauUsd.chp);
+  if (d.xauUsd) {
+    updatePriceDisplay('intlPrice', d.xauUsd.price, '$', 0, 'intlChange', d.xauUsd.change, d.xauUsd.changePct);
   }
 
-  // Gold CNY (either from API or calculated)
-  if (data.xauCny) {
-    updatePriceDisplay('spotPrice', data.xauCny.price, '¥', 2, 'spotChange', data.xauCny.ch, data.xauCny.chp);
-
-    const spotCny = data.xauCny.price;
-    // Jewelry price = spot + 12%
-    const jewelryPrice = spotCny * 1.12;
-    document.getElementById('jewelryPrice').textContent = `¥${jewelryPrice.toFixed(2)}`;
-    // Buyback price = spot - 3%
-    const buybackPrice = spotCny * 0.97;
-    document.getElementById('buybackPrice').textContent = `¥${buybackPrice.toFixed(2)}`;
-
-    // Update store prices
-    updateStorePrices(spotCny);
-
-    // Update other metals in CNY
-    if (data.xagUsd) {
-      const agCnyPerGram = (data.xagUsd.price * state.exchangeRate) / 31.1035;
-      document.getElementById('silverCny').textContent = `¥${agCnyPerGram.toFixed(2)}`;
-    }
-    if (data.xptUsd) {
-      const ptCnyPerGram = (data.xptUsd.price * state.exchangeRate) / 31.1035;
-      document.getElementById('platinumCny').textContent = `¥${ptCnyPerGram.toFixed(2)}`;
-    }
-    if (data.xpdUsd) {
-      const pdCnyPerGram = (data.xpdUsd.price * state.exchangeRate) / 31.1035;
-      document.getElementById('palladiumCny').textContent = `¥${pdCnyPerGram.toFixed(2)}`;
-    }
+  // Gold CNY
+  if (d.xauCny) {
+    updatePriceDisplay('spotPrice', d.xauCny.price, '¥', 2, 'spotChange', d.xauCny.change, d.xauCny.changePct);
+    document.getElementById('jewelryPrice').textContent = '¥' + (d.jewelryPrice || (d.xauCny.price * 1.12)).toFixed(2);
+    document.getElementById('buybackPrice').textContent = '¥' + (d.buybackPrice || (d.xauCny.price * 0.97)).toFixed(2);
+    updateStorePrices(d.xauCny.price);
   }
 
   // Other metals USD
-  if (data.xagUsd) {
-    document.getElementById('silverUsd').textContent = `$${data.xagUsd.price.toFixed(2)}`;
-  }
-  if (data.xptUsd) {
-    document.getElementById('platinumUsd').textContent = `$${data.xptUsd.price.toFixed(2)}`;
-  }
-  if (data.xpdUsd) {
-    document.getElementById('palladiumUsd').textContent = `$${data.xpdUsd.price.toFixed(2)}`;
-  }
+  if (d.xagUsd) document.getElementById('silverUsd').textContent = '$' + d.xagUsd.price.toFixed(2);
+  if (d.xptUsd) document.getElementById('platinumUsd').textContent = '$' + d.xptUsd.price.toFixed(2);
+  if (d.xpdUsd) document.getElementById('palladiumUsd').textContent = '$' + d.xpdUsd.price.toFixed(2);
 
-  setStatus('ok', `数据正常 · ${sourceTag}`);
+  // Other metals CNY
+  if (d.xagCny) document.getElementById('silverCny').textContent = '¥' + d.xagCny.price.toFixed(2);
+  if (d.xptCny) document.getElementById('platinumCny').textContent = '¥' + d.xptCny.price.toFixed(2);
+  if (d.xpdCny) document.getElementById('palladiumCny').textContent = '¥' + d.xpdCny.price.toFixed(2);
+
+  updateTimeDisplay();
 }
 
 function updatePriceDisplay(elId, price, prefix, decimals, changeElId, changeVal, changePct) {
-  const oldPrice = state.previousPrices[elId];
   const el = document.getElementById(elId);
-  const newText = `${prefix}${price.toFixed(decimals)}`;
-
-  if (oldPrice && oldPrice !== price) {
-    el.classList.remove('price-flash');
-    void el.offsetWidth; // reflow
-    el.classList.add('price-flash');
-  }
-
+  const old = previousPrices[elId];
+  const newText = prefix + price.toFixed(decimals);
+  if (old && old !== price) { el.classList.remove('price-flash'); void el.offsetWidth; el.classList.add('price-flash'); }
   el.textContent = newText;
-  state.previousPrices[elId] = price;
+  previousPrices[elId] = price;
 
-  if (changeElId && changeVal !== undefined) {
-    const changeEl = document.getElementById(changeElId);
+  if (changeElId && changeVal !== undefined && changeVal !== null) {
+    const ce = document.getElementById(changeElId);
     const isUp = changeVal > 0;
-    const isDown = changeVal < 0;
     const sign = isUp ? '+' : '';
-    const color = isUp ? 'var(--up-color)' : isDown ? 'var(--down-color)' : 'var(--text-secondary)';
-    changeEl.textContent = `${sign}${changeVal.toFixed(decimals + 1)} (${sign}${(changePct || 0).toFixed(2)}%)`;
-    changeEl.style.color = color;
-    changeEl.style.background = isUp ? 'rgba(34,197,94,0.1)' : isDown ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.04)';
+    const color = isUp ? 'var(--up-color)' : changeVal < 0 ? 'var(--down-color)' : 'var(--text-secondary)';
+    ce.textContent = `${sign}${changeVal.toFixed(2)} (${sign}${(changePct || 0).toFixed(2)}%)`;
+    ce.style.color = color;
+    ce.style.background = isUp ? 'rgba(34,197,94,0.1)' : changeVal < 0 ? 'rgba(239,68,68,0.1)' : 'rgba(255,255,255,0.04)';
   }
 }
 
@@ -764,26 +523,23 @@ function updateStorePrices(spotCny) {
     { name: '六福珠宝', ids: ['lfJewelry', 'lfBar', 'lfBuyback'] },
     { name: '中国黄金', ids: ['zgJewelry', 'zgBar', 'zgBuyback'] },
   ];
-
   stores.forEach(({ name, ids }) => {
     const p = STORE_PREMIUMS[name];
-    document.getElementById(ids[0]).textContent = `¥${(spotCny * p.jewelry).toFixed(0)}`;
-    document.getElementById(ids[1]).textContent = `¥${(spotCny * p.bar).toFixed(0)}`;
-    document.getElementById(ids[2]).textContent = `¥${(spotCny * p.buyback).toFixed(0)}`;
+    document.getElementById(ids[0]).textContent = '¥' + (spotCny * p.jewelry).toFixed(0);
+    document.getElementById(ids[1]).textContent = '¥' + (spotCny * p.bar).toFixed(0);
+    document.getElementById(ids[2]).textContent = '¥' + (spotCny * p.buyback).toFixed(0);
   });
 }
 
-function setStatus(type, message) {
+function setStatus(type, msg) {
   const bar = document.getElementById('statusBar');
-  if (type === 'ok') {
-    bar.innerHTML = `<span class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs"
-      style="background: rgba(34,197,94,0.08); color: #22c55e; border: 1px solid rgba(34,197,94,0.15);">
-      <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>${message}</span>`;
-  } else {
-    bar.innerHTML = `<span class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs"
-      style="background: rgba(239,68,68,0.08); color: #ef4444; border: 1px solid rgba(239,68,68,0.15);">
-      <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>${message}</span>`;
-  }
+  bar.innerHTML = type === 'ok'
+    ? `<span class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs"
+        style="background:rgba(34,197,94,0.08);color:#22c55e;border:1px solid rgba(34,197,94,0.15);">
+        <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>${msg}</span>`
+    : `<span class="inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs"
+        style="background:rgba(239,68,68,0.08);color:#ef4444;border:1px solid rgba(239,68,68,0.15);">
+        <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>${msg}</span>`;
 }
 </script>
 </body>
