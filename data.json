@@ -1,39 +1,39 @@
 {
   "xauUsd": {
-    "price": 4470.33,
+    "price": 4473.89,
     "open": 4439.41,
-    "high": 4484.05,
+    "high": 4514.59,
     "low": 4424.32,
-    "change": 30.920000000000073,
-    "changePct": 0.7,
-    "time": "2026-06-04 12:51:40"
+    "change": 34.48000000000047,
+    "changePct": 0.78,
+    "time": "2026-06-04 20:38:08"
   },
   "xagUsd": {
-    "price": 73.374,
+    "price": 73.874,
     "open": 72.874,
-    "high": 73.909,
+    "high": 75.042,
     "low": 72.47,
-    "change": 0.5,
-    "changePct": 0.69,
-    "time": "2026-06-04 12:51:40"
+    "change": 1.0,
+    "changePct": 1.37,
+    "time": "2026-06-04 20:38:08"
   },
   "xptUsd": {
-    "price": 1883.61,
+    "price": 1898.05,
     "open": 1863.5,
-    "high": 1892.09,
+    "high": 1904.94,
     "low": 1854.32,
-    "change": 20.1099999999999,
-    "changePct": 1.08,
-    "time": "2026-06-04 12:51:40"
+    "change": 34.549999999999955,
+    "changePct": 1.85,
+    "time": "2026-06-04 20:38:08"
   },
   "xpdUsd": {
-    "price": 1313.05,
+    "price": 1321.92,
     "open": 1313.55,
-    "high": 1333.2,
+    "high": 1334.6,
     "low": 1307.45,
-    "change": -0.5,
-    "changePct": -0.04,
-    "time": "2026-06-04 12:51:40"
+    "change": 8.370000000000118,
+    "changePct": 0.64,
+    "time": "2026-06-04 20:38:08"
   },
   "usdCny": {
     "price": 6.77477,
@@ -45,30 +45,30 @@
     "time": "2026-06-04 12:00:56"
   },
   "xauCny": {
-    "price": 973.7,
-    "change": 6.73,
-    "changePct": 0.7,
-    "time": "2026-06-04 12:51:40"
+    "price": 974.47,
+    "change": 7.51,
+    "changePct": 0.78,
+    "time": "2026-06-04 20:38:08"
   },
   "xagCny": {
-    "price": 15.98,
-    "change": 0.11,
-    "changePct": 0.69,
-    "time": "2026-06-04 12:51:40"
+    "price": 16.09,
+    "change": 0.22,
+    "changePct": 1.37,
+    "time": "2026-06-04 20:38:08"
   },
   "xptCny": {
-    "price": 410.28,
-    "change": 4.38,
-    "changePct": 1.08,
-    "time": "2026-06-04 12:51:40"
+    "price": 413.42,
+    "change": 7.53,
+    "changePct": 1.85,
+    "time": "2026-06-04 20:38:08"
   },
   "xpdCny": {
-    "price": 286.0,
-    "change": -0.11,
-    "changePct": -0.04,
-    "time": "2026-06-04 12:51:40"
+    "price": 287.93,
+    "change": 1.82,
+    "changePct": 0.64,
+    "time": "2026-06-04 20:38:08"
   },
-  "jewelryPrice": 1090.54,
-  "buybackPrice": 944.49,
-  "updatedAt": "2026-06-04 10:51:45"
+  "jewelryPrice": 1091.41,
+  "buybackPrice": 945.24,
+  "updatedAt": "2026-06-04 18:38:12"
 }
